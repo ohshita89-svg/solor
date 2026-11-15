@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sun angle from your heading</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;700&display=swap">
+<style>
+:root{--bg:#f6f5f1;--fg:#1d2430;color-scheme:light;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161d;--fg:#e8ebf0;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#12161d;--fg:#e8ebf0;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px);background:var(--bg);transition:filter .6s}
+*{box-sizing:border-box}
+body{margin:0;color:var(--fg);font-family:"Roboto Condensed","Avenir Next Condensed","HelveticaNeue-CondensedBold","Arial Narrow",sans-serif;font-stretch:condensed;line-height:1.6}
+main{max-width:560px;margin:0 auto;padding:16px}
+.sky{border-radius:20px;padding:18px 18px 20px;color:rgb(200,200,200);background:rgb(60,60,60);text-align:center}
+.top{display:flex;justify-content:center;align-items:baseline;gap:14px;flex-wrap:wrap;font-size:.85rem}
+#spd{font-variant-numeric:tabular-nums}
+#dial{width:100%;max-width:340px;height:auto;display:block;margin:6px auto 0}
+.rel{font-size:clamp(1.9rem,9vw,2.6rem);font-weight:600;line-height:1.2;margin-top:6px}
+.sub{font-size:.9rem}
+.sw{display:flex;align-items:center;gap:10px;width:fit-content;margin:0;font-size:.95rem;cursor:pointer;position:relative}
+.sw input{position:absolute;opacity:0;width:100%;height:100%;left:0;top:0;margin:0;cursor:pointer}
+.trk{width:50px;height:30px;border-radius:15px;background:rgb(0,0,0);position:relative;transition:background .2s;flex:none}
+.trk::after{content:"";position:absolute;left:3px;top:3px;width:24px;height:24px;border-radius:50%;background:rgb(200,200,200);transition:transform .2s,background .2s}
+.sw input:checked+.trk{background:rgb(255,255,255)}
+.sw input:checked+.trk::after{transform:translateX(20px);background:rgb(60,60,60)}
+.sw input:focus-visible+.trk{outline:3px solid #3b82f6;outline-offset:2px}
+.man circle,.man rect{fill:#ffffff}
+.sw.on .trk{background:#ffffff}
+.sw.on .trk::after{transform:translateX(20px);background:#3c3c3c}
+html.neg{filter:invert(1) hue-rotate(180deg)}
+.sws{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:12px 22px;margin-top:14px}
+</style>
+</head>
+<body>
+<main>
+  <section class="sky" id="sky" aria-live="polite">
+    <div class="top"><span id="when">Getting location…</span><span id="spd">-- km/h</span></div>
+    <svg id="dial" viewBox="0 0 200 200" role="img" aria-label="Compass with your heading at the top. A person and shadow at the center, the sun’s position on the ring">
+      <circle cx="100" cy="100" r="78" fill="rgb(200,200,200)" stroke="rgb(200,200,200)" stroke-width="2"/>
+      <g id="rings" fill="none" stroke="rgb(180,180,180)" stroke-width="0.5" aria-hidden="true"><circle cx="100" cy="100" r="52"/><circle cx="100" cy="100" r="26"/></g>
+      <g id="rot"><g id="ticks" stroke="rgb(50,50,50)"></g><g id="lbl"></g>
+        <line id="shd" x1="100" y1="100" x2="100" y2="100" stroke="rgb(0,0,0)" stroke-width="6" stroke-linecap="round" visibility="hidden"/>
+        <circle id="sun" cx="100" cy="22" r="9" fill="#ef2b2b"/></g>
+      <g class="man" fill="#ffffff" transform="translate(0 -13)" aria-hidden="true"><circle style="fill:#ffffff" fill="#ffffff" cx="100" cy="92" r="3.6"/><rect style="fill:#ffffff" fill="#ffffff" x="96.5" y="96.5" width="7" height="9" rx="2"/><rect style="fill:#ffffff" fill="#ffffff" x="96.8" y="105" width="2.8" height="8" rx="1.2"/><rect style="fill:#ffffff" fill="#ffffff" x="100.4" y="105" width="2.8" height="8" rx="1.2"/><rect style="fill:#ffffff" fill="#ffffff" x="93.5" y="97" width="2.6" height="8" rx="1.3"/><rect style="fill:#ffffff" fill="#ffffff" x="103.9" y="97" width="2.6" height="8" rx="1.3"/></g>
+      <polygon points="92,3 108,3 100,19" fill="rgb(200,200,200)"/>
+      <text x="100" y="119" text-anchor="middle" font-size="9" fill="rgb(255,255,255)">Sun altitude</text>
+      <text id="altn" x="100" y="140" text-anchor="middle" font-size="18" fill="rgb(255,255,255)">--</text>
+    </svg>
+    <div class="rel" id="rel">--</div>
+    <div class="sub" id="relnote">Start moving to use GPS heading, or turn the switch on to use the phone’s direction.</div>
+    <div class="sub" id="azinfo"></div>
+    <div class="sub" id="state"></div>
+    <div class="sws"><label class="sw" id="sw"><input id="cmp" type="checkbox" role="switch" aria-label="Compass sensor"><span class="trk"></span><span>Compass</span></label>
+    <label class="sw on" id="sw2"><input id="auto" type="checkbox" role="switch" aria-label="Auto invert at night" checked><span class="trk"></span><span>Auto invert at night</span></label></div>
+  </section>
+</main>
+<script>
+const R=Math.PI/180,$=id=>document.getElementById(id),NS="http://www.w3.org/2000/svg";
+let pos=null,head=null,headT=0,oriOn=false,oriGot=false,lastR=0,sensorMsg="",autoInv=true;
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);p.appendChild(e);return e}
+function sun(date,lat,lon){
+  const jd=date.getTime()/864e5+2440587.5,n=jd-2451545;
+  const L=(280.46+0.9856474*n)%360,g=((357.528+0.9856003*n)%360)*R;
+  const lam=(L+1.915*Math.sin(g)+0.02*Math.sin(2*g))*R,eps=(23.439-4e-7*n)*R;
+  const ra=Math.atan2(Math.cos(eps)*Math.sin(lam),Math.cos(lam));
+  const dec=Math.asin(Math.sin(eps)*Math.sin(lam));
+  const gmst=((18.697374558+24.06570982441908*n)%24)*15;
+  const ha=((gmst+lon)*R-ra),la=lat*R;
+  const alt=Math.asin(Math.sin(la)*Math.sin(dec)+Math.cos(la)*Math.cos(dec)*Math.cos(ha));
+  let az=Math.atan2(Math.sin(ha),Math.cos(ha)*Math.sin(la)-Math.tan(dec)*Math.cos(la))/R+180;
+  return{alt:alt/R,az:((az%360)+360)%360};
+}
+const dirs=["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+function label(a){
+  if(a<-18)return"Night";
+  if(a<-12)return"Astronomical twilight";
+  if(a<-6)return"Nautical twilight";
+  if(a<0)return"Civil twilight";
+  if(a<10)return"Low sun";
+  if(a<50)return"Daytime";
+  return"High sun";
+}
+const tk=$("ticks"),lb=$("lbl"),labels=[];
+for(let d=0;d<360;d+=10){
+  const a=d*R,m=d%90===0?12:d%30===0?8:5,w=d%30===0?1.8:0.5;
+  el("line",{x1:100+78*Math.sin(a),y1:100-78*Math.cos(a),x2:100+(78-m)*Math.sin(a),y2:100-(78-m)*Math.cos(a),"stroke-width":w},tk);
+}
+[["N",0],["E",90],["S",180],["W",270]].forEach(([t,d])=>{
+  const a=d*R,x=100+56*Math.sin(a),y=100-56*Math.cos(a)+5;
+  const e=el("text",{x:x,y:y,"text-anchor":"middle","font-size":15,"font-weight":700,fill:"rgb(50,50,50)"},lb);
+  e.textContent=t;labels.push({e,x,y});
+});
+function render(){
+  if(!pos)return;
+  const d=new Date(),s=sun(d,pos.lat,pos.lon),h=head===null?0:head;
+  $("altn").textContent=s.alt.toFixed(1)+"°";
+  document.documentElement.classList.toggle("neg",autoInv&&s.alt<=0);
+  const sh=$("shd");
+  if(s.alt<=0.5)sh.setAttribute("visibility","hidden");
+  else{
+    const L=Math.min(78,30/Math.tan(s.alt*R)),b=(s.az+180)*R;
+    sh.setAttribute("x2",(100+L*Math.sin(b)).toFixed(1));sh.setAttribute("y2",(100-L*Math.cos(b)).toFixed(1));sh.setAttribute("visibility","visible");
+  }
+  $("rot").setAttribute("transform","rotate("+(-h).toFixed(1)+" 100 100)");
+  labels.forEach(o=>o.e.setAttribute("transform","rotate("+h.toFixed(1)+" "+o.x.toFixed(1)+" "+o.y.toFixed(1)+")"));
+  const a=s.az*R,sn=$("sun");
+  const rr=78*(1-Math.max(0,Math.min(90,s.alt))/90);
+  sn.setAttribute("cx",(100+rr*Math.sin(a)).toFixed(1));sn.setAttribute("cy",(100-rr*Math.cos(a)).toFixed(1));
+  sn.setAttribute("opacity",s.alt<0?"0.4":"1");
+  $("when").textContent=d.toLocaleString("en-US",{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false});
+  $("azinfo").textContent="Sun azimuth "+dirs[Math.round(s.az/22.5)%16]+" "+s.az.toFixed(0)+"°";
+  $("state").textContent=label(s.alt);
+  const ok=head!==null&&(Date.now()-headT<30000);
+  if(!ok){$("rel").textContent="--";$("relnote").textContent=sensorMsg||"Heading unavailable. Start moving or turn the switch on (north is up for now).";return}
+  const rel=((s.az-head+540)%360)-180,ar=Math.abs(rel),sd=rel>0?"right":"left";
+  const t=ar<10?"Straight ahead":ar<80?"Front "+sd:ar<100?(rel>0?"Right":"Left")+" side":ar<170?"Rear "+sd:"Directly behind";
+  $("rel").textContent=t+" "+ar.toFixed(0)+"°";
+  const stale=Date.now()-headT>5000;
+  $("relnote").textContent="Heading "+dirs[Math.round(head/22.5)%16]+" "+head.toFixed(0)+"°"+(stale?" (last value)":"")+(s.alt<0?" · Sun below horizon":"");
+}
+function setPos(lat,lon){pos={lat,lon};render()}
+function onOri(e){
+  let h=null;
+  if(typeof e.webkitCompassHeading==="number"&&!isNaN(e.webkitCompassHeading))h=e.webkitCompassHeading;
+  else if(e.absolute&&e.alpha!=null)h=(360-e.alpha)%360;
+  if(h===null)return;
+  const now=Date.now();
+  oriGot=true;
+  if(head===null)head=h;
+  else head=(head+(((h-head+540)%360)-180)*0.35+360)%360;
+  headT=now;sensorMsg="";
+  if(now-lastR>60){lastR=now;render()}
+}
+function sensorOff(msg){
+  window.removeEventListener("deviceorientationabsolute",onOri,true);
+  window.removeEventListener("deviceorientation",onOri,true);
+  oriOn=false;oriGot=false;$("cmp").checked=false;$("sw").classList.remove("on");sensorMsg=msg||"";head=null;render();
+}
+$("cmp").onclick=async()=>{
+  $("sw").classList.toggle("on",$("cmp").checked);
+  if(!$("cmp").checked){sensorOff("");return}
+  try{
+    if(typeof DeviceOrientationEvent!=="undefined"&&typeof DeviceOrientationEvent.requestPermission==="function"){
+      const r=await DeviceOrientationEvent.requestPermission();
+      if(r!=="granted"){sensorOff("Compass sensor was not allowed. Fully quit the browser, reopen the page, turn the switch on again and choose “Allow”.");return}
+    }
+    window.addEventListener("deviceorientationabsolute",onOri,true);
+    window.addEventListener("deviceorientation",onOri,true);
+    oriOn=true;oriGot=false;head=null;
+    sensorMsg="Waiting for sensor values. Move the device a little.";render();
+    setTimeout(()=>{if(oriOn&&!oriGot)sensorOff("No heading values received. Check that the page is opened as a normal https page.")},3000);
+  }catch(err){sensorOff("The compass sensor is not available here.")}
+};
+$("auto").onclick=()=>{autoInv=$("auto").checked;$("sw2").classList.toggle("on",autoInv);render()};
+function onWatch(p){
+  const c=p.coords;
+  setPos(c.latitude,c.longitude);
+  $("spd").textContent=(c.speed==null||isNaN(c.speed)?"--":(c.speed*3.6).toFixed(1))+" km/h";
+  if(!oriOn&&c.heading!=null&&!isNaN(c.heading)&&c.speed!=null&&c.speed>=1){head=c.heading;headT=Date.now();render()}
+}
+function geoErr(e){$("spd").textContent=e&&e.code===1?"Location unavailable":"-- km/h"}
+if(navigator.geolocation){
+  navigator.geolocation.getCurrentPosition(p=>setPos(p.coords.latitude,p.coords.longitude),()=>setPos(35.681,139.767),{timeout:8000,maximumAge:600000});
+  navigator.geolocation.watchPosition(onWatch,geoErr,{enableHighAccuracy:true,maximumAge:2000});
+}else setPos(35.681,139.767);
+setInterval(render,1000);
+</script>
+</body>
+</html>
