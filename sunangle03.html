@@ -42,9 +42,9 @@ html.neg{filter:invert(1) hue-rotate(180deg)}
 .wg{display:grid;grid-template-columns:1.5fr 1.2fr 1fr 1fr 1fr;gap:4px}
 .wlab{font-size:.75rem;margin-bottom:4px}
 .wrow{position:relative;margin-top:2px}
-.wheel{height:150px;overflow-y:auto;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;overscroll-behavior:contain;padding:56px 0;box-sizing:content-box}
+.wheel{height:150px;overflow-y:auto;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;overscroll-behavior:contain;padding:56px 0;box-sizing:border-box}
 .wheel::-webkit-scrollbar{display:none}
-.wi{height:38px;line-height:38px;scroll-snap-align:center;font-size:1.25rem;font-variant-numeric:tabular-nums}
+.wi{height:38px;line-height:38px;scroll-snap-align:center;scroll-snap-stop:always;font-size:1.25rem;font-variant-numeric:tabular-nums}
 .band{position:absolute;left:0;right:0;top:56px;height:38px;border-top:1px solid rgb(200,200,200);border-bottom:1px solid rgb(200,200,200);background:rgba(255,255,255,.08);pointer-events:none}
 .srow{display:flex;justify-content:center;gap:10px;margin-top:16px;flex-wrap:wrap}
 </style>
