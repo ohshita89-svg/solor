@@ -14,7 +14,7 @@ html{scroll-padding-top:env(safe-area-inset-top,0px);background:var(--bg)}
 body{margin:0;color:var(--fg);font-family:"Roboto Condensed","Avenir Next Condensed","HelveticaNeue-CondensedBold","Arial Narrow",sans-serif;font-stretch:condensed;line-height:1.6}
 main{max-width:560px;margin:0 auto;padding:16px}
 .sky{border-radius:20px;padding:18px 18px 20px;color:rgb(200,200,200);background:rgb(60,60,60);text-align:center}
-.top{display:flex;justify-content:center;align-items:baseline;gap:14px;flex-wrap:wrap;font-size:.85rem;font-variant-numeric:tabular-nums}
+.top{display:flex;justify-content:space-between;align-items:center;gap:14px;font-size:.85rem;font-variant-numeric:tabular-nums}
 #dial{width:100%;max-width:340px;height:auto;display:block;margin:6px auto 0}
 .rel{font-size:clamp(1.9rem,9vw,2.6rem);font-weight:600;line-height:1.2;margin-top:6px}
 .sub{font-size:.72rem;line-height:1.25}
@@ -26,12 +26,19 @@ main{max-width:560px;margin:0 auto;padding:16px}
 .sw.on .trk{background:#ffffff}
 .sw.on .trk::after{transform:translateX(20px);background:#3c3c3c}
 .sw input:focus-visible+.trk{outline:3px solid #3b82f6;outline-offset:2px}
+.rds{display:flex;gap:14px}
+.rd{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.95rem}
+.rd input{appearance:none;-webkit-appearance:none;width:18px;height:18px;margin:0;border:2px solid rgb(200,200,200);border-radius:50%;display:inline-grid;place-content:center;background:transparent;cursor:pointer}
+.rd input:checked::before{content:"";width:8px;height:8px;border-radius:50%;background:rgb(255,255,255)}
+.rd input:focus-visible{outline:3px solid #3b82f6;outline-offset:2px}
+.btn{padding:8px 22px;border:1px solid rgb(200,200,200);border-radius:20px;background:transparent;color:rgb(200,200,200);font:inherit;font-size:.95rem;cursor:pointer;width:fit-content}
+.btn:focus-visible{outline:3px solid #3b82f6;outline-offset:2px}
 </style>
 </head>
 <body>
 <main>
   <section class="sky" aria-live="polite">
-    <div class="top"><span id="st">Cellular</span><span id="lat">-- ms</span></div>
+    <div class="top"><div class="rds" role="radiogroup" aria-label="Connection to measure"><label class="rd"><input type="radio" name="mode" value="0" checked>Cellular</label><label class="rd"><input type="radio" name="mode" value="1">Wi‑Fi</label></div><span id="lat">-- ms</span></div>
     <svg id="dial" viewBox="0 0 200 200" role="img" aria-label="Compass dial. Wedges show connection quality in each direction; the top is where the phone points">
       <circle cx="100" cy="100" r="78" fill="rgb(200,200,200)" stroke="rgb(200,200,200)" stroke-width="2"/>
       <g id="rot"><g id="wedges"></g><g fill="none" stroke="rgb(100,100,100)" stroke-width="0.5" aria-hidden="true"><circle cx="100" cy="100" r="52"/><circle cx="100" cy="100" r="26"/></g><g id="ticks" stroke="rgb(50,50,50)"></g><g id="lbl"></g></g>
@@ -47,15 +54,15 @@ main{max-width:560px;margin:0 auto;padding:16px}
     <div class="sub" id="bw"></div>
     <div class="sub">Response time of the connection in use, not signal strength.</div>
     <div class="sws">
-      <label class="sw" id="swm"><span>Cellular</span><input id="mode" type="checkbox" role="switch" aria-label="Measure Wi-Fi when on, cellular when off"><span class="trk"></span><span>Wi‑Fi</span></label>
       <label class="sw" id="sw"><input id="cmp" type="checkbox" role="switch" aria-label="Compass sensor"><span class="trk"></span><span>Compass</span></label>
+      <button class="btn" id="go" type="button">Start</button>
     </div>
   </section>
 </main>
 <script>
 const R=Math.PI/180,$=id=>document.getElementById(id),NS="http://www.w3.org/2000/svg";
 const NAMES=["N","NNE","ENE","E","ESE","SSE","S","SSW","WSW","W","WNW","NNW"],BASE=location.href.split("#")[0].split("?")[0];
-let head=null,oriOn=false,oriGot=false,lastR=0,sensorMsg="",mode=0,lat=null,lastQ=null;
+let head=null,oriOn=false,oriGot=false,lastR=0,sensorMsg="",mode=0,lat=null,lastQ=null,running=false,runId=0;
 const store=[0,1].map(()=>Array.from({length:12},()=>({q:null})));
 function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);p.appendChild(e);return e}
 const tk=$("ticks"),lb=$("lbl"),wd=$("wedges"),labels=[],paths=[];
@@ -78,13 +85,13 @@ function render(){
   const h=head===null?0:head,S=store[mode];
   $("rot").setAttribute("transform","rotate("+(-h).toFixed(1)+" 100 100)");
   labels.forEach(o=>o.e.setAttribute("transform","rotate("+h.toFixed(1)+" "+o.x.toFixed(1)+" "+o.y.toFixed(1)+")"));
-  S.forEach((c,k)=>paths[k].setAttribute("d",c.q===null?"":wedge(k,c.q)));
-  $("st").textContent=mode?"Wi‑Fi":"Cellular";
+  const nowT=Date.now();
+  S.forEach((c,k)=>{paths[k].setAttribute("d",c.q===null?"":wedge(k,c.q));paths[k].setAttribute("fill-opacity",c.q===null?1:Math.max(0.15,1-(nowT-(c.t||0))/10000).toFixed(2))});
   $("lat").textContent=lat===null?(lastQ===null?"-- ms":"timeout"):Math.round(lat)+" ms";
   const to=lat===null&&lastQ!==null;
   $("ms").textContent=to?"":(lat===null?"--":Math.round(lat));
   $("phone").setAttribute("visibility",to?"visible":"hidden");
-  $("rel").textContent=lastQ===null?"--":qlabel(lastQ)+" "+Math.round(lastQ*100);
+  $("rel").textContent=lastQ===null?(running?"--":"Press Start"):qlabel(lastQ)+" "+Math.round(lastQ*100);
   $("note").textContent=oriOn&&head!==null?"Heading "+NAMES[Math.round(head/30)%12]+" "+head.toFixed(0)+"°":(sensorMsg||"Turn the Compass switch on to map directions.");
   const m=S.map((c,k)=>({k,q:c.q})).filter(x=>x.q!==null).sort((a,b)=>b.q-a.q);
   $("bw").textContent=m.length>=2?"Best "+NAMES[m[0].k]+" "+Math.round(m[0].q*100)+" · Worst "+NAMES[m[m.length-1].k]+" "+Math.round(m[m.length-1].q*100):"Rotate slowly to map directions.";
@@ -97,11 +104,13 @@ async function ping(){
     clearTimeout(to);return performance.now()-t0;
   }catch(e){return null}
 }
-async function loop(){
+async function loop(id){
+  if(id!==runId)return;
   const ms=await ping(),q=ms===null?0:Math.max(0,Math.min(1,1-Math.log(ms/40)/Math.log(25)));
+  if(id!==runId)return;
   lat=ms;lastQ=q;
-  if(oriOn&&head!==null){const c=store[mode][Math.round(head/30)%12];c.q=c.q===null?q:c.q*0.6+q*0.4}
-  render();setTimeout(loop,600);
+  if(oriOn&&head!==null){const c=store[mode][Math.round(head/30)%12];c.q=c.q===null?q:c.q*0.6+q*0.4;c.t=Date.now()}
+  render();setTimeout(()=>loop(id),600);
 }
 function onOri(e){
   let h=null;
@@ -132,8 +141,15 @@ $("cmp").onclick=async()=>{
     setTimeout(()=>{if(oriOn&&!oriGot)sensorOff("No heading values received. Check that the page is opened as a normal https page.")},3000);
   }catch(err){sensorOff("The compass sensor is not available here.")}
 };
-$("mode").onclick=()=>{mode=$("mode").checked?1:0;$("swm").classList.toggle("on",!!mode);lat=null;lastQ=null;render()};
-render();loop();
+document.querySelectorAll('input[name="mode"]').forEach(r=>{r.onchange=()=>{mode=+r.value;lat=null;lastQ=null;render()}});
+$("go").onclick=()=>{
+  runId++;running=!running;
+  $("go").textContent=running?"Stop":"Start";
+  if(running)loop(runId);
+  render();
+};
+render();
+setInterval(render,250);
 </script>
 </body>
 </html>
