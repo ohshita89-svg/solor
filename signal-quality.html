@@ -14,7 +14,7 @@ html{scroll-padding-top:env(safe-area-inset-top,0px);background:var(--bg)}
 body{margin:0;color:var(--fg);font-family:"Roboto Condensed","Avenir Next Condensed","HelveticaNeue-CondensedBold","Arial Narrow",sans-serif;font-stretch:condensed;line-height:1.6}
 main{max-width:560px;margin:0 auto;padding:16px}
 .sky{border-radius:20px;padding:18px 18px 20px;color:rgb(200,200,200);background:rgb(60,60,60);text-align:center}
-.top{display:flex;justify-content:space-between;align-items:center;gap:14px;font-size:.85rem;font-variant-numeric:tabular-nums}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;font-size:.85rem;font-variant-numeric:tabular-nums}
 #dial{width:100%;max-width:340px;height:auto;display:block;margin:6px auto 0}
 .rel{font-size:clamp(1.9rem,9vw,2.6rem);font-weight:600;line-height:1.2;margin-top:6px}
 .sub{font-size:.72rem;line-height:1.25}
@@ -38,12 +38,14 @@ main{max-width:560px;margin:0 auto;padding:16px}
 .rd input[value="0"]:checked::before{background:rgb(255,200,0)}
 .rd input[value="1"]{border-color:rgb(0,150,255)}
 .rd input[value="1"]:checked::before{background:rgb(0,150,255)}
+.topl{text-align:left;flex:1;min-width:0}
+.topl .sub{margin-top:4px}
 </style>
 </head>
 <body>
 <main>
   <section class="sky" aria-live="polite">
-    <div class="top"><div class="rds" role="radiogroup" aria-label="Connection to measure"><label class="rd"><input type="radio" name="mode" value="0" checked>Cellular</label><label class="rd"><input type="radio" name="mode" value="1">Wi‑Fi</label></div><label class="sw" id="sw"><input id="cmp" type="checkbox" role="switch" aria-label="Compass sensor"><span class="trk"></span><span>Compass</span></label></div>
+    <div class="top"><div class="topl"><div class="rds" role="radiogroup" aria-label="Connection to measure"><label class="rd"><input type="radio" name="mode" value="0" checked>Cellular</label><label class="rd"><input type="radio" name="mode" value="1">Wi‑Fi</label></div><div class="sub" id="hint"></div></div><label class="sw" id="sw"><input id="cmp" type="checkbox" role="switch" aria-label="Compass sensor"><span class="trk"></span><span>Compass</span></label></div>
     <svg id="dial" viewBox="0 0 200 200" role="img" aria-label="Compass dial. Wedges show connection quality in each direction; the top is where the phone points">
       <circle cx="100" cy="100" r="78" fill="rgb(200,200,200)" stroke="rgb(200,200,200)" stroke-width="2"/>
       <g id="rot"><g id="wedges"></g><g fill="none" stroke="rgb(100,100,100)" stroke-width="0.5" aria-hidden="true"><circle cx="100" cy="100" r="52"/><circle cx="100" cy="100" r="26"/></g><g id="ticks" stroke="rgb(50,50,50)"></g><g id="lbl"></g></g>
@@ -57,7 +59,6 @@ main{max-width:560px;margin:0 auto;padding:16px}
     <div class="sub" id="note">Turn the Compass switch on to map directions.</div>
     <div class="sub" id="bw"></div>
     <div class="sub">Rough download speed of a test file, not signal strength.</div>
-    <div class="sub" id="hint"></div>
   </section>
 </main>
 <script>
@@ -90,7 +91,12 @@ function render(){
   let hint=mode?"Wi‑Fi: stay connected to the network you want to test.":"Cellular: turn Wi‑Fi off in Settings first. This page can’t choose the connection.";
   if(ct==="wifi"&&!mode)hint="Warning: the phone is on Wi‑Fi, so this measures Wi‑Fi, not cellular.";
   if(ct==="cellular"&&mode)hint="Warning: the phone is on cellular, so this measures cellular, not Wi‑Fi.";
-  $("hint").textContent=hint;
+  const hk=mode+hint,he=$("hint");
+  if(he.dataset.k!==hk){
+    const i=hint.indexOf(": "),sp=document.createElement("span");
+    sp.style.color=mode?"rgb(0,150,255)":"rgb(255,200,0)";sp.textContent=hint.slice(0,i+1);
+    he.textContent="";he.append(sp,hint.slice(i+1));he.dataset.k=hk;
+  }
   const nowT=Date.now(),maxV=Math.max(0,...S.map(c=>c.q===null?0:c.v));
   S.forEach((c,k)=>{paths[k].setAttribute("d",c.q===null?"":wedge(k,maxV>0?c.v/maxV:0));paths[k].setAttribute("fill",mode?"rgb(0,150,255)":"rgb(255,200,0)");paths[k].setAttribute("fill-opacity",c.q===null?1:Math.max(0.3,1-(nowT-(c.t||0))/10000).toFixed(2))});
   $("ms").textContent=lat===null?(lastQ===null?"--":"0.0"):lat.toFixed(1);
