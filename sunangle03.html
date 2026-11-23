@@ -68,7 +68,7 @@ html.neg{filter:invert(1) hue-rotate(180deg)}
     <div class="sub" id="relnote">Start moving to use GPS heading, or turn the switch on to use the phone’s direction.</div>
     <div class="sub" id="azinfo"></div>
     <div class="sub" id="state"></div>
-    <div class="sws"><label class="sw" id="sw"><input id="cmp" type="checkbox" role="switch" aria-label="Compass sensor"><span class="trk"></span><span>Compass</span></label><label class="sw" id="lsw"><input id="lvl" type="checkbox" role="switch" aria-label="Level mode"><span class="trk"></span><span>Level mode</span></label>
+    <div class="sws"><label class="sw" id="sw"><span id="lc">Compass</span><input id="cmp" type="checkbox" role="switch" aria-label="Mode: off is Compass, on is Level"><span class="trk"></span><span id="ll">Level</span></label>
     <button class="btn" id="dtb" type="button">Date &amp; time</button></div>
   </section>
 </main>
@@ -183,15 +183,14 @@ function onOri(e){
 function sensorOff(msg){
   window.removeEventListener("deviceorientationabsolute",onOri,true);
   window.removeEventListener("deviceorientation",onOri,true);
-  oriOn=false;oriGot=false;$("cmp").checked=false;ori=null;sm=null;iosOff=null;levelOn=false;$("lvl").checked=false;$("lsw").classList.remove("on");$("sw").classList.remove("on");sensorMsg=msg||"";head=null;render();
+  oriOn=false;oriGot=false;ori=null;sm=null;iosOff=null;sensorMsg=msg||"";head=null;render();
 }
-$("cmp").onclick=async()=>{
-  $("sw").classList.toggle("on",$("cmp").checked);
-  if(!$("cmp").checked){sensorOff("");return}
+async function startSensor(){
+  if(oriOn)return;
   try{
     if(typeof DeviceOrientationEvent!=="undefined"&&typeof DeviceOrientationEvent.requestPermission==="function"){
       const r=await DeviceOrientationEvent.requestPermission();
-      if(r!=="granted"){sensorOff("Compass sensor was not allowed. Fully quit the browser, reopen the page, turn the switch on again and choose “Allow”.");return}
+      if(r!=="granted"){sensorOff("Compass sensor was not allowed. Fully quit the browser, reopen the page, tap the screen and choose “Allow”.");return}
     }
     window.addEventListener("deviceorientationabsolute",onOri,true);
     window.addEventListener("deviceorientation",onOri,true);
@@ -199,13 +198,18 @@ $("cmp").onclick=async()=>{
     sensorMsg="Waiting for sensor values. Move the device a little.";render();
     setTimeout(()=>{if(oriOn&&!oriGot)sensorOff("No heading values received. Check that the page is opened as a normal https page.")},3000);
   }catch(err){sensorOff("The compass sensor is not available here.")}
-};
-$("lvl").onclick=async()=>{
-  levelOn=$("lvl").checked;$("lsw").classList.toggle("on",levelOn);sm=null;
-  if(levelOn&&!oriOn){$("cmp").checked=true;await $("cmp").onclick()}
-  if(levelOn&&!oriOn){levelOn=false;$("lvl").checked=false;$("lsw").classList.remove("on")}
+}
+function setMode(){
+  levelOn=$("cmp").checked;sm=null;
+  $("sw").classList.toggle("on",levelOn);
+  $("lc").style.opacity=levelOn?".5":"1";$("ll").style.opacity=levelOn?"1":".5";
   render();
-};
+}
+$("cmp").onchange=setMode;setMode();
+if(typeof DeviceOrientationEvent!=="undefined"&&typeof DeviceOrientationEvent.requestPermission==="function"){
+  sensorMsg="Tap the screen to start the compass sensor.";
+  document.addEventListener("click",startSensor,{once:true});
+}else startSensor();
 const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],IH=38;
 const wy=$("wy"),wm=$("wm"),wd=$("wd"),wh=$("wh"),wn=$("wn"),ov=$("dtov");
 function rng(a,b){const r=[];for(let i=a;i<=b;i++)r.push(i);return r}
